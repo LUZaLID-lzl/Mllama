@@ -1,0 +1,23 @@
+问题: Ollama如何安装？
+回答: 在Linux上使用apt安装，Windows下载安装包。
+
+问题: 如何查看Ollama运行的模型？
+回答: 使用命令 `ollama ps`。
+
+问题: 我的师傅叫什么？
+回答: 中文名字叫程乾，英文名字叫gang sir。
+
+问题: 【模块】：CtsAppSecurityHostTestCases<br/>【case】：android.appsecurity.cts.ApexSignatureVerificationTest#testApexPubKeyIsNotWellKnownKey<br/>android.appsecurity.cts.AuthBoundKeyTest#useInvalidatedAuthBoundKey
+回答: com.android.i18n；com.android.runtime；com.android.art<br/>以上3个APEX需要使用自定义签名<br/>报错的apex使用了google默认签名， 所以导致测试Fail.
+
+问题: 【模块】：CtsAppTestCases<br/>【case】：<br />android.app.cts.SystemFeaturesTest#testSensorFeatures
+回答: 项目mk文件中缺少对Sensor的配置
+
+问题: 【模块】：CtsTelephonyTestCases<br/>【case】：android.telephony.cts.SmsUsageMonitorShortCodeTest#testSmsShortCodeDestination
+回答: google 修改了 fw Italy SMS shortcode但未做cts测试工具同步，修改shortcode即可
+
+问题: 【模块】：CtsSecurityHostTestCases<br/>【case】：android.security.cts.SELinuxHostTest#testNoBugreportDenials
+回答: 为客户dl_wificonfig_service配置selinux后fix
+
+问题: 【模块】：CtsSensorTestCases<br/>【case】：android.hardware.cts.SensorTest#testSensorOperations<br/>android.hardware.cts.SensorTest#testSensorTimeStamps
+回答: 需要考虑wwan和wlan兼容的问题，wwan和wlan 用的sensor不同

@@ -1,0 +1,25 @@
+knowledge_base/
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── endpoints/
+│   │       ├── __init__.py
+│   │       ├── knowledge.py
+│   │       └── data.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   └── llm_config.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── knowledge.py
+│   └── services/
+│       ├── __init__.py
+│       ├── knowledge_service.py
+│       └── data_service.py
+├── data/
+│   └── testdata.txt
+├── requirements.txt
+└── README.md 
