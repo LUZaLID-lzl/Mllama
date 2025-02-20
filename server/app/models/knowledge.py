@@ -33,4 +33,36 @@ class StreamResponse(BaseModel):
 
 class QueryRequest(BaseModel):
     question: str
-    stream: bool = False  # 是否使用流式响应 
+    stream: bool = False  # 是否使用流式响应
+
+class QuestionItem(BaseModel):
+    title: str
+    question: str
+
+class QuestionCategory(BaseModel):
+    id: int
+    category: str
+    questions: List[QuestionItem]
+
+class QuestionBank(BaseModel):
+    questions: List[QuestionCategory]
+
+class DefaultQuestion(BaseModel):
+    id: int
+    title: str
+    question: str
+    category: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "title": "GMS认证流程",
+                "question": "GMS认证流程介绍",
+                "category": "GMS认证"
+            }
+        }
+
+# 可以删除这个类，因为我们直接返回 List[DefaultQuestion]
+# class DefaultQuestionsResponse(BaseModel):
+#     questions: List[DefaultQuestion] 

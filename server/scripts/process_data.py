@@ -3,82 +3,50 @@
 import os
 import sys
 from pathlib import Path
-from typing import List
-import logging
 
 # 添加项目根目录到 Python 路径
 project_root = str(Path(__file__).parent.parent)
 sys.path.append(project_root)
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
+from app.services.data_service import DataService
 from app.core.server_config import server_settings
-from app.utils.document_processor import DocumentProcessor
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-def process_data(data_dir: str = None):
-    """处理数据并构建向量数据库"""
+def process_data():
+    """处理文档并创建向量库"""
     try:
-        if data_dir is None:
-            data_dir = os.path.join(project_root, "data")
+        print("\n=== 开始处理文档 ===")
+        
+        # 检查数据目录
+        data_dir = server_settings.DATA_DIR
+        if not os.path.exists(data_dir):
+            print(f"错误: 数据目录不存在: {data_dir}")
+            return False
             
-        logger.info(f"开始处理目录: {data_dir}")
+        # 创建数据服务
+        data_service = DataService()
         
-        # 初始化文档处理器
-        doc_processor = DocumentProcessor()
-        all_documents = []
+        # 处理文档
+        result = data_service.process_documents()
         
-        # 处理所有支持的文件
-        supported_extensions = {'.txt', '.pdf', '.docx', '.doc', '.md', '.markdown'}
-        
-        for root, _, files in os.walk(data_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                file_ext = os.path.splitext(file)[1].lower()
-                
-                if file_ext not in supported_extensions:
-                    logger.warning(f"跳过不支持的文件: {file_path}")
-                    continue
-                    
-                try:
-                    logger.info(f"处理文件: {file_path}")
-                    documents = doc_processor.process_file(file_path)
-                    all_documents.extend(documents)
-                    logger.info(f"成功处理文件: {file_path}, 生成 {len(documents)} 个文档片段")
-                except Exception as e:
-                    logger.error(f"处理文件失败 {file_path}: {str(e)}")
-        
-        if not all_documents:
-            raise ValueError("没有找到可处理的文档")
+        if result["success"]:
+            print("\n处理成功:")
+            print(f"- 总文件数: {result['total_files']}")
+            print(f"- 处理文件数: {result['processed_files']}")
+            print(f"- 跳过文件数: {result['skipped_files']}")
+            print(f"- 总文档数: {result['total_documents']}")
+            print(f"- 总块数: {result['total_chunks']}")
+            print(f"- 处理时间: {result['processing_time']:.2f}秒")
+            return True
+        else:
+            print("\n处理失败:")
+            print(f"错误: {result['error']}")
+            print("详细信息:", result['details'])
+            return False
             
-        logger.info(f"共处理 {len(all_documents)} 个文档片段")
-        
-        # 构建向量数据库
-        logger.info("开始构建向量数据库...")
-        embeddings = HuggingFaceEmbeddings(
-            model_name=server_settings.EMBEDDING_MODEL
-        )
-        vector_db = FAISS.from_documents(all_documents, embeddings)
-        
-        # 确保保存目录存在
-        os.makedirs(server_settings.VECTOR_DB_PATH, exist_ok=True)
-        vector_db.save_local(server_settings.VECTOR_DB_PATH)
-        logger.info(f"向量数据库已保存到: {server_settings.VECTOR_DB_PATH}")
-        
-        return True
-        
     except Exception as e:
-        logger.error(f"处理数据失败: {str(e)}")
+        print(f"处理文档时出错: {str(e)}")
         return False
 
 if __name__ == "__main__":
-    # 可以通过命令行参数指定数据目录
-    data_dir = sys.argv[1] if len(sys.argv) > 1 else None
-    success = process_data(data_dir)
+    success = process_data()
     sys.exit(0 if success else 1) 

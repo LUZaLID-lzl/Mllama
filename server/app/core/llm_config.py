@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class LLMSettings(BaseSettings):
     DATA_DIR: str = "data"
-    EMBEDDING_MODEL: str = "BAAI/bge-small-zh-v1.5"
+    EMBEDDING_MODEL: str = "BAAI/bge-large-zh-v1.5"
     VECTOR_DB_PATH: str = "faiss_index"
     LLM_MODEL: str = "deepseek-r1:8b"
     TEMPERATURE: float = 0.3

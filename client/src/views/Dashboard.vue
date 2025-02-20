@@ -49,8 +49,20 @@
       </div>
 
       <div class="user-profile">
-        <el-avatar class="user-avatar" :src="'/user.png'"></el-avatar>
-        <span class="username">{{ username }}</span>
+        <div class="user-info">
+          <el-avatar class="user-avatar" :src="'/user.png'"></el-avatar>
+          <div class="user-details">
+            <span class="username">{{ username }}</span>
+            <span class="user-role">普通用户</span>
+          </div>
+        </div>
+        <el-button 
+          text 
+          class="logout-btn"
+          @click="logout"
+        >
+          <el-icon><SwitchButton /></el-icon>
+        </el-button>
       </div>
     </div>
 
@@ -78,117 +90,12 @@
         </div>
       </div>
 
-      <div class="chat-area">
-        <template v-if="!currentChat">
-          <div class="suggestions">
-            <div class="welcome-header">
-              <div class="welcome-icon">
-                <img src="/src/assets/maidu_logo.png" alt="Maidu Logo" width="120" height="120" />
-              </div>
-              <div class="welcome-text">
-                <h2>我是 <span class="brand-name">Mllama</span>，很高兴见到你！</h2>
-                <h5 class="welcome-subtitle">我可以回答认证相关的问题，请把你的任务交给我吧~</h5>
-              </div>
-            </div>
-            <div class="suggestion-grid">
-              <el-card 
-                v-for="item in suggestions" 
-                :key="item.title"
-                class="suggestion-card"
-                @click="useExample(item)"
-              >
-                <h4>{{ item.title }}</h4>
-                <p>{{ item.desc }}</p>
-              </el-card>
-            </div>
-          </div>
-          <div class="input-area">
-            <div class="input-box">
-              <el-input
-                v-model="inputMessage"
-                type="textarea"
-                :rows="1"
-                :autosize="{ minRows: 1, maxRows: 4 }"
-                placeholder="给 Mllama 发送消息"
-                @keydown.enter.exact.prevent="sendMessage"
-                @keydown.enter.shift.exact.prevent="inputMessage += '\n'"
-                resize="none"
-                class="message-input"
-              />
-              
-              <div class="input-footer">
-                <div class="left-actions">
-                  <el-button class="mode-btn">
-                    <el-icon><Cpu /></el-icon>
-                    深度思考 (R1)
-                  </el-button>
-                </div>
-                <div class="right-actions">
-                  <el-button class="action-btn">
-                    <el-icon><Paperclip /></el-icon>
-                  </el-button>
-                  <el-button class="send-btn" @click="sendMessage" :disabled="!inputMessage.trim()">
-                    <el-icon><Position /></el-icon>
-                  </el-button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-        <template v-else>
-          <div class="messages">
-            <div v-for="(message, index) in currentChat.messages" 
-              :key="index"
-              class="message"
-              :class="message.role"
-            >
-              <div class="message-avatar">
-                <el-avatar 
-                  :size="36" 
-                  :class="message.role === 'assistant' ? 'ai-avatar' : 'user-avatar'"
-                >
-                  {{ message.role === 'assistant' ? 'AI' : 'U' }}
-                </el-avatar>
-              </div>
-              <div class="message-content">
-                <div class="message-text">{{ message.content }}</div>
-              </div>
-            </div>
-          </div>
-          <div class="input-area" :class="{ 'input-fixed': currentChat }">
-            <div class="input-box">
-              <el-input
-                v-model="inputMessage"
-                type="textarea"
-                :rows="1"
-                :autosize="{ minRows: 1, maxRows: 4 }"
-                placeholder="给 Mllama 发送消息"
-                @keydown.enter.exact.prevent="sendMessage"
-                @keydown.enter.shift.exact.prevent="inputMessage += '\n'"
-                resize="none"
-                class="message-input"
-              />
-              
-              <div class="input-footer">
-                <div class="left-actions">
-                  <el-button class="mode-btn">
-                    <el-icon><Cpu /></el-icon>
-                    深度思考 (R1)
-                  </el-button>
-                </div>
-                <div class="right-actions">
-                  <el-button class="action-btn">
-                    <el-icon><Paperclip /></el-icon>
-                  </el-button>
-                  <el-button class="send-btn" @click="sendMessage" :disabled="!inputMessage.trim()">
-                    <el-icon><Position /></el-icon>
-                  </el-button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-      </div>
+      <!-- 使用新组件 -->
+      <ChatArea
+        v-model:currentChat="currentChat"
+        :serverError="serverError"
+        @create-chat="handleCreateChat"
+      />
     </div>
 
     <!-- 添加服务器错误提示 -->
@@ -217,17 +124,21 @@ import {
   Link,
   Paperclip,
   Position,
-  Document,
   EditPen,
   StarFilled,
   CircleCloseFilled,
   Delete,
-  RefreshRight
+  RefreshRight,
+  SwitchButton,
+  Close,
+  Document,
+  Loading
 } from '@element-plus/icons-vue'
 import Cookies from 'js-cookie'
 import { useRouter } from 'vue-router'
 import { chatService } from '../api/chat'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import ChatArea from '../components/ChatArea.vue'
 
 const username = ref(Cookies.get('username') || 'Guest')
 const sidebarOpen = ref(true)
@@ -239,6 +150,7 @@ const serverStatus = ref(null)
 const serverError = ref(null)
 const modelName = ref('No Model')
 const syncing = ref(false)
+const isGenerating = ref(false)
 
 const router = useRouter()
 const checkAuth = () => {
@@ -346,93 +258,10 @@ const selectChat = (chat) => {
   saveState()
 }
 
-const sendMessage = async () => {
-  if (!inputMessage.value.trim()) return
-  
-  // 检查服务器状态
-  if (serverError.value) {
-    ElMessage.error(serverError.value)
-    return
-  }
-
-  if (!currentChat.value) {
-    const newChat = {
-      id: Date.now(),
-      title: inputMessage.value.slice(0, 20) + (inputMessage.value.length > 20 ? '...' : ''),
-      date: new Date().toLocaleString(),
-      messages: []
-    }
-    chatList.value.unshift(newChat)
-    currentChat.value = newChat
-    saveState()
-  }
-
-  // 添加用户消息
-  const userMessage = {
-    role: 'user',
-    content: inputMessage.value,
-    time: new Date().toLocaleString()
-  }
-  currentChat.value.messages.push(userMessage)
-  
-  // 清空输入框
-  const messageToSend = inputMessage.value
-  inputMessage.value = ''
-
-  try {
-    const loadingMessage = {
-      role: 'assistant',
-      content: '正在思考...',
-      time: new Date().toLocaleString(),
-      loading: true
-    }
-    currentChat.value.messages.push(loadingMessage)
-
-    console.log('开始请求API...')
-    const response = await chatService.sendMessage(messageToSend)
-    console.log('API返回结果:', response)
-    
-    currentChat.value.messages.pop()
-    
-    // 添加更详细的响应处理
-    if (response.answer) {
-      console.log('使用 answer 字段')
-      currentChat.value.messages.push({
-        role: 'assistant',
-        content: response.answer,
-        time: new Date().toLocaleString()
-      })
-    } else if (response.data) {
-      console.log('使用 data 字段')
-      currentChat.value.messages.push({
-        role: 'assistant',
-        content: response.data,
-        time: new Date().toLocaleString()
-      })
-    } else {
-      console.warn('响应中没有找到有效的回复内容:', response)
-      currentChat.value.messages.push({
-        role: 'assistant',
-        content: '抱歉，返回的数据格式不正确',
-        time: new Date().toLocaleString()
-      })
-    }
-
-    // 每次消息更新后保存状态
-    saveState()
-  } catch (error) {
-    console.error('发送消息错误:', error)
-    currentChat.value.messages.pop()
-    
-    currentChat.value.messages.push({
-      role: 'assistant',
-      content: error.message,
-      time: new Date().toLocaleString(),
-      error: true
-    })
-
-    saveState()
-  }
+const handleCreateChat = (newChat) => {
+  chatList.value.unshift(newChat)
+  currentChat.value = newChat
+  saveState()
 }
 
 const logout = () => {
@@ -651,24 +480,54 @@ const handleSync = async () => {
 }
 
 .user-profile {
-  padding: 16px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  background-color: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.user-info {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .user-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 6px !important;
+  border-radius: 6px;
   background-color: transparent;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .username {
   font-size: 14px;
-  color: #374151;
   font-weight: 500;
+  color: #374151;
+  line-height: 1.2;
+}
+
+.user-role {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.logout-btn {
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+  color: #ef4444;
+  transform: rotate(180deg);
 }
 
 .main-content {
@@ -810,11 +669,14 @@ const handleSync = async () => {
 }
 
 .message-text {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.6;
-  color: #374151;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.message-text.thinking {
+  color: #6b7280; /* 淡灰色 */
 }
 
 .message.assistant {
@@ -989,6 +851,15 @@ const handleSync = async () => {
   cursor: not-allowed;
 }
 
+/* 生成中的发送按钮样式 */
+.send-btn.is-generating {
+  background-color: #ef4444;
+}
+
+.send-btn.is-generating:hover {
+  background-color: #dc2626;
+}
+
 /* 图标大小统一 */
 .el-icon {
   font-size: 16px;
@@ -1063,6 +934,14 @@ const handleSync = async () => {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.chat-item:hover {
+  background-color: #f3f4f6;
+}
+
+.chat-item.active {
+  background-color: #e5e7eb;
 }
 
 .chat-item-main {
@@ -1237,5 +1116,185 @@ const handleSync = async () => {
 
 .sync-btn.is-loading:hover :deep(.el-icon) {
   transform: none;
+}
+
+.message-loading {
+  background-color: #f3f4f6;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border-top-left-radius: 4px;
+  max-width: 80%;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.loading-content :deep(.el-skeleton__text) {
+  height: 16px;
+}
+
+/* 调整骨架屏的颜色 */
+:deep(.el-skeleton__item) {
+  background: rgba(156, 163, 175, 0.2);
+}
+
+:deep(.el-skeleton__item--text) {
+  background: rgba(156, 163, 175, 0.2);
+}
+
+.thinking-process {
+  color: #6b7280;
+  font-size: 13px;
+  padding: 12px;
+  background-color: rgba(243, 244, 246, 0.8);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-family: var(--font-mono);
+  border: 1px solid rgba(156, 163, 175, 0.2);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #4b5563;
+  font-size: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(156, 163, 175, 0.2);
+}
+
+.thinking-header .el-icon {
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.final-answer {
+  color: #374151;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 12px 16px;
+  background-color: #f3f4f6;
+  border-radius: 12px;
+  border-top-left-radius: 4px;
+}
+
+.streaming-text {
+  position: relative;
+  display: inline-block;
+}
+
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background-color: currentColor;
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.sources-container {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.sources-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeIn 0.3s ease;
+}
+
+.source-item {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #4b5563;
+  padding: 8px 12px;
+  background-color: rgba(243, 244, 246, 0.8);
+  border-radius: 6px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideIn 0.3s ease;
+  cursor: default;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.source-index {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.status-block {
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-block.searching {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.status-header .el-icon {
+  animation: pulse 2s infinite;
 }
 </style> 

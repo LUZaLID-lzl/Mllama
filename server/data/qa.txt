@@ -3,3 +3,9 @@
 
 问题: 微服务有什么优势？
 回答: 1. 独立部署... 
+
+问题: CTA是什么？
+回答: 通常是指中国泰尔认证中心（China Telecommunication Technology Labs Authentication Center，简称CTA）提供的认证
+
+问题: GMS是什么
+回答: android的GMS认证，用于获取google的服务

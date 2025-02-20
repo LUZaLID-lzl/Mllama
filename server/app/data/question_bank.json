@@ -1,0 +1,108 @@
+{
+    "questions": [
+        {
+            "id": 1,
+            "category": "GMS认证",
+            "questions": [
+                {
+                    "title": "GMS认证流程",
+                    "question": "GMS认证流程介绍"
+                },
+                {
+                    "title": "GMS测试要求",
+                    "question": "GMS认证测试的主要要求有哪些?"
+                },
+                {
+                    "title": "GMS常见问题",
+                    "question": "GMS认证过程中的常见问题和解决方案"
+                },
+                {
+                    "title": "GMS签名机制",
+                    "question": "GMS应用的签名机制是什么?"
+                },
+                {
+                    "title": "GMS兼容性测试",
+                    "question": "如何进行GMS兼容性测试，有哪些关键点?"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "category": "CTA认证",
+            "questions": [
+                {
+                    "title": "CTA认证流程",
+                    "question": "CTA认证的基本流程是什么?"
+                },
+                {
+                    "title": "CTA测试项目",
+                    "question": "CTA认证包含哪些主要测试项目?"
+                },
+                {
+                    "title": "CTA认证要求",
+                    "question": "CTA认证的基本要求和标准有哪些?"
+                },
+                {
+                    "title": "CTA文档准备",
+                    "question": "CTA认证需要准备哪些文档材料?"
+                },
+                {
+                    "title": "CTA常见问题",
+                    "question": "CTA认证过程中的常见问题和注意事项"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "category": "认证模板",
+            "questions": [
+                {
+                    "title": "认证申请模板",
+                    "question": "认证申请书应该如何撰写，有什么模板可以参考?"
+                },
+                {
+                    "title": "测试报告模板",
+                    "question": "测试报告的标准格式和关键内容有哪些?"
+                },
+                {
+                    "title": "整改报告模板",
+                    "question": "如何编写认证整改报告?"
+                },
+                {
+                    "title": "自检报告模板",
+                    "question": "认证自检报告应该包含哪些内容?"
+                },
+                {
+                    "title": "文档规范",
+                    "question": "认证相关文档的命名规范和格式要求是什么?"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "category": "CE认证",
+            "questions": [
+                {
+                    "title": "CE认证介绍",
+                    "question": "CE认证的基本概念和重要性是什么?"
+                },
+                {
+                    "title": "CE认证流程",
+                    "question": "CE认证的申请流程和时间周期?"
+                },
+                {
+                    "title": "CE测试要求",
+                    "question": "CE认证的主要测试项目和要求有哪些?"
+                },
+                {
+                    "title": "CE文档要求",
+                    "question": "CE认证需要准备的技术文档有哪些?"
+                },
+                {
+                    "title": "CE常见问题",
+                    "question": "CE认证过程中的常见问题和解决方案"
+                }
+            ]
+        }
+    ]
+} 

@@ -6,18 +6,84 @@ from app.models.knowledge import (
     Query, 
     QueryResponse,
     QueryRequest,
-    StreamResponse
+    StreamResponse,
+    DefaultQuestion
 )
 from app.services.knowledge_service import KnowledgeService
 from app.services.llm_service import LLMService
 import json
 from app.core.model_manager import ModelManager
 from langchain_huggingface import HuggingFaceEmbeddings
+from typing import List, Dict
+from app.services.question_service import QuestionService
 
 router = APIRouter()
 knowledge_service = KnowledgeService()
 llm_service = LLMService()
 model_manager = ModelManager()
+question_service = QuestionService()
+
+# 添加默认问题列表
+DEFAULT_QUESTIONS = [
+    {
+        "id": 1,
+        "title": "GMS认证",
+        "question": "GMS认证流程介绍"
+    },
+    {
+        "id": 2,
+        "title": "ODEX优化",
+        "question": "如何提高ODEX优化进度?"
+    },
+    {
+        "id": 3,
+        "title": "系统性能",
+        "question": "Android系统性能优化的主要方法有哪些?"
+    }
+]
+
+@router.get("/default-questions", response_model=List[DefaultQuestion])
+async def get_default_questions():
+    """获取默认问题列表（每次随机3个）"""
+    try:
+        questions = question_service.get_random_questions(count=3)
+        print(f"获取到 {len(questions)} 个问题")
+        
+        if not questions:
+            print("警告: 没有获取到任何问题")
+            return [
+                DefaultQuestion(
+                    id=1,
+                    title="GMS认证流程",
+                    question="GMS认证流程介绍",
+                    category="GMS认证"
+                )
+            ]
+        
+        # 验证数据结构
+        for q in questions:
+            if not all(k in q for k in ["id", "title", "question", "category"]):
+                print(f"警告: 问题数据结构不完整: {q}")
+                continue
+        
+        return [
+            DefaultQuestion(
+                id=q["id"],
+                title=q["title"],
+                question=q["question"],
+                category=q["category"]
+            ) for q in questions if all(k in q for k in ["id", "title", "question", "category"])
+        ]
+    except Exception as e:
+        print(f"处理默认问题失败: {str(e)}")
+        return [
+            DefaultQuestion(
+                id=1,
+                title="GMS认证流程",
+                question="GMS认证流程介绍",
+                category="GMS认证"
+            )
+        ]
 
 @router.post("/", response_model=KnowledgeBase)
 async def create_knowledge(knowledge: KnowledgeCreate):

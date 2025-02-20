@@ -1,161 +1,116 @@
 import os
 import time
-from typing import Dict, Any, List, Tuple
-from langchain_community.document_loaders import (
-    TextLoader,
-    CSVLoader,
-    JSONLoader,
-    UnstructuredMarkdownLoader
-)
-from langchain_huggingface import HuggingFaceEmbeddings
+from pathlib import Path
+from typing import List, Dict
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from app.core.server_config import server_settings
+from app.utils.document_processor import DocumentProcessor
 
 class DataService:
     def __init__(self):
-        self.LOADER_CONFIG = {
-            ".txt": {
-                "loader": TextLoader,
-                "args": {"encoding": "utf-8"}
-            },
-            ".csv": {
-                "loader": CSVLoader,
-                "args": {"csv_args": {"fieldnames": ["question", "answer"]}}
-            },
-            ".json": {
-                "loader": JSONLoader,
-                "args": {"jq_schema": ".[] | {question: .q, answer: .a}"}
-            },
-            ".md": {
-                "loader": UnstructuredMarkdownLoader,
-                "args": {}
-            }
-        }
+        self.doc_processor = DocumentProcessor()
+        self.supported_extensions = {'.txt', '.pdf', '.docx', '.doc', '.md', '.markdown'}
         
-        self.reset_stats()
-
-    def reset_stats(self):
-        """重置处理统计"""
-        self.processing_stats = {
+    def process_documents(self) -> Dict:
+        """处理文档并构建向量数据库"""
+        start_time = time.time()
+        result = {
+            "success": False,
             "total_files": 0,
             "processed_files": 0,
             "skipped_files": 0,
             "total_documents": 0,
             "total_chunks": 0,
-            "file_details": []
+            "processing_time": 0,
+            "error": None,
+            "details": []
         }
-
-    async def load_all_documents(self, data_dir: str) -> Tuple[List, Dict[str, Any]]:
-        """加载目录下所有支持格式的文件"""
-        self.reset_stats()
-        documents = []
-        
-        if not os.path.exists(data_dir):
-            raise Exception(f"数据目录不存在: {data_dir}")
-        
-        for root, _, files in os.walk(data_dir):
-            self.processing_stats["total_files"] += len(files)
-            
-            for file in files:
-                file_path = os.path.join(root, file)
-                file_ext = os.path.splitext(file)[1].lower()
-                
-                file_stat = {
-                    "file_name": file,
-                    "file_path": file_path,
-                    "file_type": file_ext,
-                    "status": "skipped",
-                    "documents": 0,
-                    "error": None
-                }
-                
-                if file_ext not in self.LOADER_CONFIG:
-                    self.processing_stats["skipped_files"] += 1
-                    file_stat["status"] = "skipped"
-                    file_stat["error"] = "不支持的文件格式"
-                    self.processing_stats["file_details"].append(file_stat)
-                    print(f"跳过不支持的文件: {file_path}")
-                    continue
-                    
-                try:
-                    config = self.LOADER_CONFIG[file_ext]
-                    loader = config["loader"](file_path, **config["args"])
-                    file_docs = loader.load()
-                    documents.extend(file_docs)
-                    
-                    self.processing_stats["processed_files"] += 1
-                    file_stat["status"] = "success"
-                    file_stat["documents"] = len(file_docs)
-                    print(f"成功处理文件: {file_path}")
-                    
-                except Exception as e:
-                    self.processing_stats["skipped_files"] += 1
-                    file_stat["status"] = "error"
-                    file_stat["error"] = str(e)
-                    print(f"处理文件失败 {file_path}: {str(e)}")
-                
-                self.processing_stats["file_details"].append(file_stat)
-                
-        self.processing_stats["total_documents"] = len(documents)
-        return documents, self.processing_stats
-
-    async def process_and_save(self, data_dir: str) -> Dict[str, Any]:
-        """处理数据并保存向量数据库"""
-        start_time = time.time()
         
         try:
-            # 1. 加载数据
-            print(f"开始处理目录: {data_dir}")
-            all_documents, stats = await self.load_all_documents(data_dir)
+            print("\n=== 开始处理文档 ===")
+            
+            # 1. 检查数据目录
+            data_dir = server_settings.DATA_DIR
+            if not os.path.exists(data_dir):
+                raise Exception(f"数据目录不存在: {data_dir}")
+            
+            # 2. 处理所有文档
+            all_documents = []
+            
+            for root, _, files in os.walk(data_dir):
+                result["total_files"] += len(files)
+                
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    file_ext = os.path.splitext(file)[1].lower()
+                    
+                    if file_ext not in self.supported_extensions:
+                        print(f"跳过不支持的文件: {file}")
+                        result["skipped_files"] += 1
+                        continue
+                    
+                    try:
+                        print(f"\n处理文件: {file}")
+                        documents = self.doc_processor.process_file(file_path)
+                        
+                        if documents:
+                            all_documents.extend(documents)
+                            result["processed_files"] += 1
+                            result["total_chunks"] += len(documents)
+                            print(f"✓ 成功处理 {len(documents)} 个文档块")
+                        else:
+                            print("✗ 文件内容为空")
+                            result["skipped_files"] += 1
+                            
+                    except Exception as e:
+                        print(f"✗ 处理失败: {str(e)}")
+                        result["skipped_files"] += 1
+                        result["details"].append({
+                            "file": file,
+                            "error": str(e)
+                        })
             
             if not all_documents:
-                return {
-                    "success": False,
-                    "error": "没有找到可处理的文档",
-                    "details": stats
-                }
-
-            # 2. 分块处理
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=400,
-                chunk_overlap=50,
-                separators=["\n问题:", "\n---\n", "\n"]
-            )
-            texts = text_splitter.split_documents(all_documents)
-            stats["total_chunks"] = len(texts)
-            print(f"文档分块完成，共 {len(texts)} 个文本块")
-
+                raise Exception("没有找到可处理的文档")
+            
+            result["total_documents"] = len(all_documents)
+            print(f"\n共处理 {result['total_documents']} 个文档块")
+            
             # 3. 构建向量数据库
-            print("开始构建向量数据库...")
+            print("\n=== 构建向量数据库 ===")
+            
+            # 设置设备
+            device = "cuda" if server_settings.USE_GPU else "cpu"
+            print(f"使用设备: {device}")
+            
+            # 初始化 Embedding 模型
             embeddings = HuggingFaceEmbeddings(
-                model_name=server_settings.EMBEDDING_MODEL
+                model_name=server_settings.EMBEDDING_MODEL,
+                model_kwargs={'device': device},
+                encode_kwargs={
+                    'batch_size': server_settings.EMBEDDING_BATCH_SIZE,
+                    'device': device,
+                    'normalize_embeddings': True
+                }
             )
-            vector_db = FAISS.from_documents(texts, embeddings)
             
-            # 确保保存目录存在
-            os.makedirs(server_settings.VECTOR_DB_PATH, exist_ok=True)
-            vector_db.save_local(server_settings.VECTOR_DB_PATH)
-            print(f"向量数据库已保存到: {server_settings.VECTOR_DB_PATH}")
+            # 创建向量数据库
+            vector_db = FAISS.from_documents(all_documents, embeddings)
             
-            # 4. 计算处理时间
-            processing_time = time.time() - start_time
+            # 保存向量数据库
+            vector_db_path = server_settings.VECTOR_DB_PATH
+            os.makedirs(vector_db_path, exist_ok=True)
+            vector_db.save_local(vector_db_path)
             
-            return {
-                "success": True,
-                "total_files": stats["total_files"],
-                "processed_files": stats["processed_files"],
-                "skipped_files": stats["skipped_files"],
-                "total_documents": stats["total_documents"],
-                "total_chunks": stats["total_chunks"],
-                "processing_time": processing_time,
-                "file_details": stats["file_details"]
-            }
+            print(f"向量数据库已保存到: {vector_db_path}")
+            
+            result["success"] = True
+            result["processing_time"] = time.time() - start_time
+            
+            return result
             
         except Exception as e:
-            print(f"处理失败: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "details": self.processing_stats
-            } 
+            result["error"] = str(e)
+            result["processing_time"] = time.time() - start_time
+            return result 
